@@ -28,33 +28,13 @@ def cross_entropy(T, Py):
     tot = T * np.log(Py)
     return tot.sum()
 
-def derivative_v(Z, T, Y):
-    return Z.T.dot(T - Y)
-
-def derivative_c(T, Y):
-    return (T - Y).sum(axis=0)
-
-def derivative_w2(Z1, Z2, T, Y, V):
-    dZ2 = (T - Y).dot(V.T) * Z2 * (1 - Z2)
-    return Z1.T.dot(dZ2)
-
-def derivative_b2(T, Y, V, Z2):
-    return ((T - Y).dot(V.T) * Z2 * (1 - Z2)).sum(axis=0)
-
-def derivative_w1(X, Z1, Z2, T, Y, V):
-    dZ1 = (T - Y).dot(V.T) * Z2 * (1 - Z2) * Z1 * (1 - Z1)
-    return X.T.dot(dZ1)
-
-def derivative_b1(T, Y, V, Z2, Z1):
-    return ((T - Y).dot(V.T) * Z2 * (1 - Z2) * Z1 * (1 - Z1)).sum(axis=0)
-
 def classification_rate(T, Y):
     return np.mean(np.argmax(T, axis=1) == np.argmax(Y, axis=1))
 
-
 learning_rate = 0.000025
 
-K = 25 # K = Number of neurons in each layer
+# Initialise wights and biases for 2 hidden layers and K neurons in each layer
+K = 25
 W1 = np.random.randn(Xtrain.shape[1], K)
 b1 = np.random.randn(K)
 W2 = np.random.randn(K,K)
@@ -65,41 +45,42 @@ c = np.random.randn(10)
 error = []
 classification = []
 num = []
-for i in range(1000):
+for i in range(10000):
 
     Z1 = feedForward(Xtrain.dot(W1) + b1)
     Z2 = feedForward(Z1.dot(W2) + b2)
     Y = softmax(Z2.dot(V) + c)
 
-    V += learning_rate * derivative_v(Z2, Ytrain, Y)
-    c += learning_rate * derivative_c(Ytrain, Y)
-    W2 += learning_rate * derivative_w2(Z1, Z2, Ytrain, Y, V)
-    b2 += learning_rate * derivative_b2(Ytrain, Y, V, Z2)
-    W1 += learning_rate * derivative_w1(Xtrain, Z1, Z2, Ytrain, Y, V)
-    b1 += learning_rate * derivative_b1(Ytrain, Y, V, Z2, Z1)
+    dJ = Ytrain - Y
+    dSZ1 = Z1 * (1 - Z1)
+    dSZ2 = Z2 * (1 - Z2)
+
+    V += learning_rate * Z2.T.dot(dJ)
+    c += learning_rate * dJ.sum(axis=0)
+
+    dJVt = dJ.dot(V.T)
+
+    W2 += learning_rate * Z1.T.dot(dJVt * dSZ2)
+    b2 += learning_rate * (dJVt * dSZ2).sum(axis=0)
+    W1 += learning_rate * Xtrain.T.dot(dJVt * dSZ2 * dSZ1)
+    b1 += learning_rate * (dJVt * dSZ2 * dSZ1).sum(axis=0)
 
     J = cross_entropy(Ytrain, Y)
 
     if i % 10 == 0:
         error.append(J)
         classification.append(np.round(100 * classification_rate(Ytrain, Y)))
-        print(i , np.round(J,2), "| Target =", np.argmax(Ytrain[i]), "| Prediction =", np.argmax(Y[i]), "| Match =", np.argmax(Ytrain[i]) == np.argmax(Y[i]))
-        if i > 9000 and np.argmax(Ytrain[i]) != np.argmax(Y[i]):
-            num.append(i)
+        print(i , np.round(J,2),
+            "| Target =", np.argmax(Ytrain[i]),
+            "| Prediction =", np.argmax(Y[i]),
+            "| Match =", np.argmax(Ytrain[i]) == np.argmax(Y[i]))
 
-
-legend1, = plt.plot(error, label='train cost')
-plt.legend([legend1])
+legend, = plt.plot(error, label='train cost')
+plt.legend([legend])
 plt.show()
 
-legend1, = plt.plot(classification, label='classification_rate')
-plt.legend([legend1])
+legend, = plt.plot(classification, label='classification_rate')
+plt.legend([legend])
 plt.show()
 
 print('Final classification_rate: ' + str(np.round(100 * classification_rate(Ytrain, Y),2)) + '%')
-
-for i in num:
-    digit = image[i]
-    plt.imshow(digit, cmap=plt.cm.binary)
-    plt.show()
-
